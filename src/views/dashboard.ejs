@@ -1,0 +1,18 @@
+<%- include('partials/auth-head', { title: 'Dashboard' }) %>
+<body>
+  <div class="auth-shell">
+    <section class="auth-card" aria-label="Dashboard overview">
+      <div class="brand"><strong>Dashboard</strong></div>
+      <p class="footer-note">You are signed in. Manage your account or log out when you are finished.</p>
+
+      <div class="form-group">
+        <p>Welcome, <strong><%= user.email %></strong></p>
+      </div>
+
+      <form method="POST" action="/auth/logout">
+        <button type="submit">Log Out</button>
+      </form>
+    </section>
+  </div>
+</body>
+</html>

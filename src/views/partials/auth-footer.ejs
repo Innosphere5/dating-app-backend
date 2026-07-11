@@ -1,0 +1,60 @@
+<script>
+  const EMAIL_TEST = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const MIN_PASSWORD_LENGTH = 8;
+
+  function isEmailValid(value) {
+    return EMAIL_TEST.test(String(value).trim());
+  }
+
+  function isPasswordValid(value) {
+    return (
+      typeof value === "string" &&
+      value.length >= MIN_PASSWORD_LENGTH &&
+      !/\s/.test(value)
+    );
+  }
+
+  function getFormField(form, fieldName) {
+    return form.elements[fieldName];
+  }
+
+  function showFieldMessage(field, message, type = "error") {
+    const container = field.closest(".form-group");
+    const messageEl = container?.querySelector(".field-message");
+    if (!messageEl) return;
+    messageEl.textContent = message || "";
+    messageEl.classList.toggle("error", type === "error");
+    messageEl.classList.toggle("success", type === "success");
+    field.classList.toggle("input-error", type === "error");
+  }
+
+  function clearFieldMessage(field) {
+    const container = field.closest(".form-group");
+    const messageEl = container?.querySelector(".field-message");
+    if (!messageEl) return;
+    messageEl.textContent = "";
+    messageEl.classList.remove("error", "success");
+    field.classList.remove("input-error");
+  }
+
+  function clearFormStatus(form) {
+    const statusBoxes = form.parentElement?.querySelectorAll(".message-box");
+    statusBoxes?.forEach((box) => {
+      box.textContent = "";
+    });
+  }
+
+  function setFormStatus(target, message, type = "error") {
+    if (!target) return;
+    target.textContent = message;
+    target.classList.toggle("error", type === "error");
+    target.classList.toggle("success", type === "success");
+  }
+
+  function focusFirstInvalid(form) {
+    const invalid = form.querySelector(".input-error");
+    if (invalid) {
+      invalid.focus();
+    }
+  }
+</script>
