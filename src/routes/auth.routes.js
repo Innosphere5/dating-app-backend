@@ -8,10 +8,12 @@ import {
   login,
   googleLogin,
   googleCallback,
+  googleSessionCallback,
   logout,
   forgotPassword,
   resetPassword,
-  dashboard
+  dashboard,
+  showUploadPage
 } from '../controllers/auth.controller.js';
 import { requireAuth, redirectIfAuthenticated } from '../middleware/auth.middleware.js';
 
@@ -25,6 +27,7 @@ router.post('/auth/register', register);
 
 router.get('/auth/google', googleLogin);
 router.get('/auth/google/callback', googleCallback);
+router.post('/auth/google/session', googleSessionCallback);
 
 router.post('/auth/logout', requireAuth, logout);
 
@@ -35,5 +38,6 @@ router.get('/auth/reset-password', showResetPasswordPage);
 router.post('/auth/reset-password', resetPassword);
 
 router.get('/dashboard', requireAuth, dashboard);
+router.get('/upload', requireAuth, showUploadPage);
 
 export default router;

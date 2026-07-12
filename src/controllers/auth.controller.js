@@ -12,7 +12,8 @@ import {
   logoutUser,
   sendPasswordResetEmail,
   updateUserPassword,
-  syncUserProfile
+  syncUserProfile,
+  getUserFromToken
 } from '../services/auth.service.js';
 import { setAuthCookies, clearAuthCookies, getAuthCookies } from '../utils/cookie.js';
 import { successResponse, errorResponse } from '../utils/response.js';
@@ -116,22 +117,49 @@ export async function googleCallback(req, res) {
   try {
     const code = req.query.code;
 
-    if (!code) {
-      return res.redirect(`${ROUTES.LOGIN}?error=oauth_failed`);
+    if (code) {
+      const result = await exchangeCodeForSession(code);
+
+      if (!result.success || !result.session) {
+        return res.redirect(`${ROUTES.LOGIN}?error=oauth_failed`);
+      }
+
+      setAuthCookies(res, result.session);
+      await syncUserProfile(result.user);
+
+      return res.redirect(ROUTES.DASHBOARD);
     }
 
-    const result = await exchangeCodeForSession(code);
-
-    if (!result.success || !result.session) {
-      return res.redirect(`${ROUTES.LOGIN}?error=oauth_failed`);
-    }
-
-    setAuthCookies(res, result.session);
-    await syncUserProfile(result.user);
-
-    return res.redirect(ROUTES.DASHBOARD);
+    return res.render('auth/google-callback');
   } catch {
     return res.redirect(`${ROUTES.LOGIN}?error=oauth_failed`);
+  }
+}
+
+export async function googleSessionCallback(req, res) {
+  try {
+    const { access_token, refresh_token, expires_in } = req.body;
+
+    if (!access_token || !refresh_token) {
+      return res.status(400).json({ success: false, message: 'OAuth session data is missing.' });
+    }
+
+    const userResult = await getUserFromToken(access_token);
+    if (!userResult.success || !userResult.user) {
+      return res.status(401).json({ success: false, message: 'Unable to validate OAuth user.' });
+    }
+
+    setAuthCookies(res, {
+      access_token,
+      refresh_token,
+      expires_in: Number(expires_in) || 3600
+    });
+
+    await syncUserProfile(userResult.user);
+
+    return res.status(200).json({ success: true, redirectTo: ROUTES.DASHBOARD });
+  } catch {
+    return res.status(500).json({ success: false, message: 'Unable to complete Google sign in.' });
   }
 }
 
@@ -192,4 +220,8 @@ export async function resetPassword(req, res) {
 
 export function dashboard(req, res) {
   res.render('dashboard', { user: req.user });
+}
+
+export function showUploadPage(req, res) {
+  res.render('upload', { user: req.user });
 }

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Completing sign in...</title>
+    <style>
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        font-family: system-ui, sans-serif;
+        background: #f6f8fa;
+        color: #111;
+      }
+      .card {
+        padding: 2rem;
+        border-radius: 16px;
+        background: white;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+        max-width: 420px;
+        width: 100%;
+        text-align: center;
+      }
+      .status {
+        margin-top: 1rem;
+        color: #555;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Signing you in…</h1>
+      <p class="status" id="status">Please wait while we complete your Google sign in.</p>
+    </div>
+
+    <script>
+      function parseHash(hash) {
+        if (!hash || hash.length <= 1) return {};
+        return Object.fromEntries(
+          hash.substring(1).split('&').map((pair) => {
+            const [key, value] = pair.split('=');
+            return [decodeURIComponent(key), decodeURIComponent(value || '')];
+          })
+        );
+      }
+
+      async function finishSignIn() {
+        const status = document.getElementById('status');
+        const session = parseHash(window.location.hash);
+
+        if (!session.access_token || !session.refresh_token) {
+          status.textContent = 'Failed to complete sign in. Redirecting to login...';
+          window.location.href = '/auth/login?error=oauth_failed';
+          return;
+        }
+
+        status.textContent = 'Completing your sign in securely...';
+
+        try {
+          const response = await fetch('/auth/google/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify(session)
+          });
+
+          const result = await response.json();
+
+          if (!response.ok || !result.success) {
+            status.textContent = 'Sign in failed. Redirecting to login...';
+            window.location.href = '/auth/login?error=oauth_failed';
+            return;
+          }
+
+          status.textContent = 'Redirecting to your dashboard...';
+          window.location.href = result.redirectTo || '/dashboard';
+        } catch (error) {
+          status.textContent = 'Unable to complete sign in. Redirecting...';
+          window.location.href = '/auth/login?error=oauth_failed';
+        }
+      }
+
+      finishSignIn();
+    </script>
+  </body>
+</html>

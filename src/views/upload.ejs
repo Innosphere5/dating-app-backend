@@ -1,0 +1,615 @@
+<%- include('partials/auth-head', { title: 'Upload Profile Images' }) %>
+<body>
+  <div class="auth-shell upload-shell">
+    <section class="auth-card upload-card" aria-label="Image upload workspace">
+      <div class="brand"><strong>Profile Photos</strong></div>
+      <h1>Upload your photos</h1>
+      <p class="footer-note">Select between 3 and 6 profile photos. Images are previewed before upload and sent to Cloudinary when you confirm.</p>
+
+      <div id="message" class="message-box" role="status" aria-live="polite"></div>
+
+      <form id="upload-form" class="upload-form" novalidate>
+
+        <!--
+          The real file input lives OUTSIDE the drop zone and is hidden off-screen
+          (not display:none — must remain interactive for the <label> to work).
+          The drop zone is a <label for="images"> so ANY click on it natively
+          opens the OS file-picker with full multi-file selection.
+        -->
+        <input
+          id="images"
+          name="images"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          multiple
+          class="file-input-sr"
+          aria-label="Select images (hold Ctrl or Cmd to pick multiple)"
+        />
+
+        <!-- Drop zone — rendered as a label so clicking opens the file picker -->
+        <label id="drop-zone" for="images" class="drop-zone" tabindex="0" aria-label="Click or drag images here to select them">
+          <div class="drop-zone-inner">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <p>Drag &amp; drop images here</p>
+            <span class="drop-zone-hint">or click to browse &amp; pick multiple</span>
+          </div>
+        </label>
+
+        <!-- Image count indicator -->
+        <div class="count-bar">
+          <span id="count-label" class="count-label">0 / 6 selected</span>
+          <span id="count-hint" class="count-hint">Need at least 3 photos</span>
+        </div>
+
+        <!-- Selected image previews -->
+        <div id="preview-section" class="preview-block" hidden>
+          <h2>Selected photos <span id="preview-badge" class="badge">0</span></h2>
+          <div id="preview" class="preview-grid"></div>
+        </div>
+
+        <button id="submit-btn" type="submit" disabled>Upload photos</button>
+      </form>
+
+      <!-- Uploaded images (shown after successful upload) -->
+      <div id="uploaded-section" class="preview-block" hidden>
+        <h2>Uploaded to Cloudinary <span id="uploaded-badge" class="badge badge-success">0</span></h2>
+        <div id="uploaded-list" class="preview-grid"></div>
+      </div>
+
+      <div class="page-links">
+        <a href="/dashboard">← Back to dashboard</a>
+      </div>
+    </section>
+  </div>
+
+  <style>
+    /* ── Upload-page specific overrides ── */
+    .upload-shell {
+      width: min(720px, 100%);
+    }
+
+    .upload-card {
+      width: 100%;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      position: relative;
+      border: 2px dashed rgba(56, 189, 248, 0.35);
+      border-radius: 20px;
+      padding: 2.4rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 200ms ease, background 200ms ease, box-shadow 200ms ease;
+      background: rgba(56, 189, 248, 0.04);
+    }
+
+    .drop-zone:hover,
+    .drop-zone:focus,
+    .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.10);
+      box-shadow: 0 0 0 6px rgba(56, 189, 248, 0.10);
+      outline: none;
+    }
+
+    .drop-zone-inner {
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.55rem;
+      color: var(--muted);
+    }
+
+    .drop-zone-inner svg {
+      color: var(--accent);
+      opacity: 0.85;
+    }
+
+    .drop-zone-inner p {
+      margin: 0;
+      font-size: 1rem;
+      color: #cbd5e1;
+    }
+
+    .drop-zone-hint {
+      font-size: 0.82rem;
+      color: var(--accent);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    /*
+      Hide the real file input off-screen (screen-reader accessible).
+      DO NOT use display:none or visibility:hidden — the input must remain
+      interactive so the associated <label for="images"> can activate it.
+    */
+    .file-input-sr {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      min-height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+    }
+
+    /* Count bar */
+    .count-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: -0.25rem;
+    }
+
+    .count-label {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+
+    .count-hint {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .count-hint.ready {
+      color: var(--success);
+    }
+
+    /* Preview grid */
+    .preview-block {
+      margin-top: 1.4rem;
+    }
+
+    .preview-block h2 {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 1rem;
+      margin: 0 0 0.85rem;
+      color: #f8fafc;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      border-radius: 99px;
+      background: rgba(56, 189, 248, 0.22);
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .badge-success {
+      background: rgba(34, 197, 94, 0.22);
+      color: var(--success);
+    }
+
+    .preview-grid {
+      display: grid;
+      gap: 0.75rem;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+
+    /* Preview card — image thumbnail */
+    .preview-card {
+      position: relative;
+      border-radius: 16px;
+      overflow: hidden;
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      aspect-ratio: 1 / 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .preview-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 300ms ease;
+    }
+
+    .preview-card:hover img {
+      transform: scale(1.04);
+    }
+
+    /* Remove button overlay */
+    .preview-card .remove-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 28px;
+      min-height: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(15, 23, 42, 0.82);
+      border: 1px solid rgba(248, 113, 113, 0.45);
+      color: #f87171;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 700;
+      transition: background 180ms ease, transform 180ms ease;
+      padding: 0;
+    }
+
+    .preview-card .remove-btn:hover {
+      background: rgba(248, 113, 113, 0.22);
+      transform: scale(1.12);
+    }
+
+    /* File name label at bottom of preview card */
+    .preview-card .file-label {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 4px 8px;
+      background: rgba(2, 6, 23, 0.72);
+      font-size: 0.72rem;
+      color: #94a3b8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: center;
+    }
+
+    /* Uploaded card (Cloudinary) */
+    .uploaded-card {
+      position: relative;
+      border-radius: 16px;
+      overflow: hidden;
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(34, 197, 94, 0.22);
+      aspect-ratio: 1 / 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .uploaded-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 300ms ease;
+    }
+
+    .uploaded-card:hover img {
+      transform: scale(1.04);
+    }
+
+    .uploaded-card a.open-link {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 5px 8px;
+      background: rgba(2, 6, 23, 0.75);
+      font-size: 0.72rem;
+      color: var(--accent);
+      font-weight: 600;
+      text-align: center;
+      text-decoration: none;
+      transition: background 180ms ease;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .uploaded-card a.open-link:hover {
+      background: rgba(14, 165, 233, 0.25);
+    }
+
+    /* Success tick overlay on uploaded cards */
+    .uploaded-card::after {
+      content: '✓';
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(34, 197, 94, 0.85);
+      color: #fff;
+      font-size: 0.7rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+    }
+
+    /* Submit button overrides */
+    #submit-btn {
+      margin-top: 0.5rem;
+    }
+
+    #submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    @media (max-width: 520px) {
+      .preview-grid {
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      }
+    }
+  </style>
+
+  <script>
+    'use strict';
+
+    const MIN_IMAGES = 3;
+    const MAX_IMAGES = 6;
+
+    const dropZone    = document.getElementById('drop-zone');
+    const fileInput   = document.getElementById('images');
+    const preview     = document.getElementById('preview');
+    const previewSect = document.getElementById('preview-section');
+    const previewBadge= document.getElementById('preview-badge');
+    const countLabel  = document.getElementById('count-label');
+    const countHint   = document.getElementById('count-hint');
+    const uploadedList= document.getElementById('uploaded-list');
+    const uploadedSect= document.getElementById('uploaded-section');
+    const uploadedBadge=document.getElementById('uploaded-badge');
+    const messageBox  = document.getElementById('message');
+    const submitBtn   = document.getElementById('submit-btn');
+
+    /** @type {File[]} */
+    let selectedFiles = [];
+
+    /* ─────────────── Messaging ─────────────── */
+    function setMessage(text, type = 'success') {
+      messageBox.textContent = text;
+      messageBox.className = `message-box ${type}`;
+    }
+
+    function clearMessage() {
+      messageBox.textContent = '';
+      messageBox.className = 'message-box';
+    }
+
+    /* ─────────────── File management ─────────────── */
+    function isDuplicate(file, list) {
+      return list.some(
+        (f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified
+      );
+    }
+
+    function addFiles(incoming) {
+      const files = Array.from(incoming || []);
+      if (!files.length) return;
+
+      clearMessage();
+
+      const next = [...selectedFiles];
+      let duplicates = 0;
+
+      for (const file of files) {
+        if (isDuplicate(file, next)) { duplicates++; continue; }
+        if (next.length >= MAX_IMAGES) {
+          setMessage(`Maximum ${MAX_IMAGES} photos allowed. Some files were not added.`, 'error');
+          break;
+        }
+        next.push(file);
+      }
+
+      if (duplicates > 0 && !messageBox.classList.contains('error')) {
+        setMessage(`${duplicates} duplicate file(s) were skipped.`, 'error');
+      }
+
+      selectedFiles = next;
+      renderPreview();
+    }
+
+    function removeFile(index) {
+      // Revoke the object URL to avoid memory leaks
+      const card = preview.children[index];
+      if (card) {
+        const img = card.querySelector('img');
+        if (img && img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+      }
+      selectedFiles.splice(index, 1);
+      clearMessage();
+      renderPreview();
+    }
+
+    /* ─────────────── Render selected previews ─────────────── */
+    function renderPreview() {
+      // Revoke old object URLs before rebuilding
+      Array.from(preview.querySelectorAll('img')).forEach((img) => {
+        if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+      });
+
+      preview.innerHTML = '';
+
+      const count = selectedFiles.length;
+      countLabel.textContent = `${count} / ${MAX_IMAGES} selected`;
+
+      if (count === 0) {
+        countHint.textContent = `Need at least ${MIN_IMAGES} photos`;
+        countHint.className = 'count-hint';
+        previewSect.hidden = true;
+        submitBtn.disabled = true;
+        return;
+      }
+
+      // Update count bar hint
+      if (count < MIN_IMAGES) {
+        countHint.textContent = `Need ${MIN_IMAGES - count} more photo${MIN_IMAGES - count !== 1 ? 's' : ''}`;
+        countHint.className = 'count-hint';
+      } else {
+        countHint.textContent = count === MAX_IMAGES ? 'Maximum reached' : 'Ready to upload!';
+        countHint.className = 'count-hint ready';
+      }
+
+      submitBtn.disabled = count < MIN_IMAGES;
+      previewSect.hidden = false;
+      previewBadge.textContent = count;
+
+      selectedFiles.forEach((file, index) => {
+        const objectUrl = URL.createObjectURL(file);
+
+        const card = document.createElement('div');
+        card.className = 'preview-card';
+
+        const img = document.createElement('img');
+        img.src = objectUrl;
+        img.alt = file.name;
+        img.loading = 'lazy';
+
+        const label = document.createElement('span');
+        label.className = 'file-label';
+        label.textContent = file.name;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'remove-btn';
+        removeBtn.setAttribute('aria-label', `Remove ${file.name}`);
+        removeBtn.textContent = '✕';
+        removeBtn.addEventListener('click', () => removeFile(index));
+
+        card.append(img, label, removeBtn);
+        preview.appendChild(card);
+      });
+    }
+
+    /* ─────────────── Render Cloudinary uploads ─────────────── */
+    function renderUploaded(images) {
+      uploadedList.innerHTML = '';
+
+      if (!images || !images.length) {
+        uploadedSect.hidden = true;
+        return;
+      }
+
+      uploadedBadge.textContent = images.length;
+      uploadedSect.hidden = false;
+
+      images.forEach((image) => {
+        const card = document.createElement('div');
+        card.className = 'uploaded-card';
+
+        const img = document.createElement('img');
+        img.src = image.url;
+        img.alt = image.publicId || 'Uploaded photo';
+        img.loading = 'lazy';
+
+        const link = document.createElement('a');
+        link.href = image.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.className = 'open-link';
+        link.textContent = 'Open ↗';
+
+        card.append(img, link);
+        uploadedList.appendChild(card);
+      });
+    }
+
+    /* ─────────────── Drag & drop ─────────────── */
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('drag-over');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      addFiles(e.dataTransfer.files);
+      fileInput.value = '';
+    });
+
+    /*
+     * Keyboard support: pressing Enter/Space on the label naturally triggers
+     * the associated file input — browsers handle this natively for <label>.
+     * We only need to prevent the default for Space to avoid page scroll.
+     */
+    dropZone.addEventListener('keydown', (e) => {
+      if (e.key === ' ') {
+        e.preventDefault(); // prevent page scroll; let the label click fire
+      }
+      // Enter is handled natively by the browser for label elements
+    });
+
+    /* ─────────────── File input change ─────────────── */
+    fileInput.addEventListener('change', (e) => {
+      addFiles(e.target.files);
+      e.target.value = ''; // reset so the same file can be re-added after removal
+    });
+
+    /* ─────────────── Form submit → upload to Cloudinary ─────────────── */
+    document.getElementById('upload-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearMessage();
+
+      if (selectedFiles.length < MIN_IMAGES || selectedFiles.length > MAX_IMAGES) {
+        setMessage(`Please select between ${MIN_IMAGES} and ${MAX_IMAGES} photos before uploading.`, 'error');
+        return;
+      }
+
+      const formData = new FormData();
+      selectedFiles.forEach((file) => formData.append('images', file));
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Uploading…';
+
+      try {
+        const response = await fetch('/api/uploads', {
+          method: 'POST',
+          body: formData,
+          credentials: 'same-origin'
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || 'Upload failed. Please try again.');
+        }
+
+        setMessage(`✓ ${result.data.count} photo${result.data.count !== 1 ? 's' : ''} uploaded successfully!`, 'success');
+
+        // Clear selected previews (revoke object URLs)
+        Array.from(preview.querySelectorAll('img')).forEach((img) => {
+          if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+        });
+        selectedFiles = [];
+        renderPreview();
+
+        renderUploaded(result.data.images || []);
+      } catch (err) {
+        setMessage(err.message || 'Unable to upload photos right now. Please try again.', 'error');
+      } finally {
+        submitBtn.disabled = selectedFiles.length < MIN_IMAGES;
+        submitBtn.textContent = 'Upload photos';
+      }
+    });
+
+    /* ─────────────── Initial render ─────────────── */
+    renderPreview();
+  </script>
+</body>
+</html>
