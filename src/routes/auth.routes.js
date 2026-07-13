@@ -13,7 +13,9 @@ import {
   forgotPassword,
   resetPassword,
   dashboard,
-  showUploadPage
+  showUploadPage,
+  showVerifyPage,
+  verifySession
 } from '../controllers/auth.controller.js';
 import { requireAuth, redirectIfAuthenticated } from '../middleware/auth.middleware.js';
 
@@ -39,5 +41,8 @@ router.post('/auth/reset-password', resetPassword);
 
 router.get('/dashboard', requireAuth, dashboard);
 router.get('/upload', requireAuth, showUploadPage);
+
+router.get('/auth/verify', showVerifyPage);
+router.post('/auth/verify/session', verifySession);
 
 export default router;

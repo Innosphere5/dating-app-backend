@@ -227,3 +227,34 @@ export function dashboard(req, res) {
 export function showUploadPage(req, res) {
   res.render('upload', { user: req.user });
 }
+
+export function showVerifyPage(req, res) {
+  res.render('auth/verify');
+}
+
+export async function verifySession(req, res) {
+  try {
+    const { access_token, refresh_token, expires_in } = req.body;
+
+    if (!access_token || !refresh_token) {
+      return res.status(400).json({ success: false, message: 'Session data is missing.' });
+    }
+
+    const userResult = await getUserFromToken(access_token);
+    if (!userResult.success || !userResult.user) {
+      return res.status(401).json({ success: false, message: 'Unable to validate user.' });
+    }
+
+    setAuthCookies(res, {
+      access_token,
+      refresh_token,
+      expires_in: Number(expires_in) || 3600
+    });
+
+    await syncUserProfile(userResult.user);
+
+    return res.status(200).json({ success: true, redirectTo: ROUTES.DASHBOARD });
+  } catch {
+    return res.status(500).json({ success: false, message: 'Unable to complete verification.' });
+  }
+}

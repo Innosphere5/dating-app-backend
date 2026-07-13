@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Verifying email...</title>
+    <style>
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        font-family: system-ui, sans-serif;
+        background: #0f172a;
+        color: #f8fafc;
+      }
+      .card {
+        padding: 2.5rem;
+        border-radius: 24px;
+        background: rgba(30, 41, 59, 0.7);
+        border: 1px solid rgba(148, 163, 184, 0.1);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        max-width: 440px;
+        width: 100%;
+        text-align: center;
+        backdrop-filter: blur(12px);
+      }
+      h1 {
+        font-size: 1.5rem;
+        margin: 0 0 1rem;
+        color: #38bdf8;
+      }
+      .status {
+        color: #94a3b8;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        margin: 0;
+      }
+      .spinner {
+        display: inline-block;
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(56, 189, 248, 0.1);
+        border-radius: 50%;
+        border-top-color: #38bdf8;
+        animation: spin 1s ease-in-out infinite;
+        margin-bottom: 1.5rem;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="spinner"></div>
+      <h1>Verifying your email</h1>
+      <p class="status" id="status">Please wait while we complete your verification and secure your session.</p>
+    </div>
+
+    <script>
+      function parseHash(hash) {
+        if (!hash || hash.length <= 1) return {};
+        return Object.fromEntries(
+          hash.substring(1).split('&').map((pair) => {
+            const [key, value] = pair.split('=');
+            return [decodeURIComponent(key), decodeURIComponent(value || '')];
+          })
+        );
+      }
+
+      async function finishVerification() {
+        const status = document.getElementById('status');
+        const session = parseHash(window.location.hash);
+
+        // Supabase sends access_token & refresh_token on verification redirect
+        if (!session.access_token || !session.refresh_token) {
+          status.textContent = 'Verification token is missing or has expired. Redirecting to login...';
+          setTimeout(() => {
+            window.location.href = '/auth/login?error=verification_failed';
+          }, 3000);
+          return;
+        }
+
+        status.textContent = 'Securing your session on the server...';
+
+        try {
+          const response = await fetch('/auth/verify/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify(session)
+          });
+
+          const result = await response.json();
+
+          if (!response.ok || !result.success) {
+            status.textContent = 'Failed to activate session. Redirecting to login...';
+            setTimeout(() => {
+              window.location.href = '/auth/login?error=session_activation_failed';
+            }, 3000);
+            return;
+          }
+
+          status.textContent = 'Email successfully verified! Redirecting to your dashboard...';
+          setTimeout(() => {
+            window.location.href = result.redirectTo || '/dashboard';
+          }, 1500);
+        } catch (error) {
+          status.textContent = 'Unable to connect to the server. Redirecting...';
+          setTimeout(() => {
+            window.location.href = '/auth/login?error=connection_error';
+          }, 3000);
+        }
+      }
+
+      finishVerification();
+    </script>
+  </body>
+</html>
