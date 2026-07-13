@@ -64,7 +64,9 @@ export async function register(req, res) {
     const result = await registerUser(data.email, data.password, emailRedirectTo);
 
     if (!result.success) {
-      return errorResponse(res, 400, AUTH_ERROR_MESSAGES.EMAIL_IN_USE);
+      const status = result.status || 400;
+      const message = result.error || AUTH_ERROR_MESSAGES.EMAIL_IN_USE;
+      return errorResponse(res, status, message);
     }
 
     return successResponse(res, 201, 'Registration successful. Please check your email to verify your account.', {

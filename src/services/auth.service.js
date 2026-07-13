@@ -8,7 +8,7 @@ export async function registerUser(email, password, emailRedirectTo) {
   });
 
   if (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: error.message, status: error.status };
   }
 
   return { success: true, user: data.user, session: data.session };
