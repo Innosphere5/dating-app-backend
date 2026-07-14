@@ -2,7 +2,8 @@ import {
   validateRegisterInput,
   validateLoginInput,
   validateEmailInput,
-  validatePasswordResetInput
+  validatePasswordResetInput,
+  validatePhoneInput
 } from '../validators/auth.validator.js';
 import {
   registerUser,
@@ -13,7 +14,9 @@ import {
   sendPasswordResetEmail,
   updateUserPassword,
   syncUserProfile,
-  getUserFromToken
+  getUserFromToken,
+  registerPhoneUser,
+  loginPhoneUser
 } from '../services/auth.service.js';
 import { setAuthCookies, clearAuthCookies, getAuthCookies } from '../utils/cookie.js';
 import { successResponse, errorResponse } from '../utils/response.js';
@@ -256,5 +259,47 @@ export async function verifySession(req, res) {
     return res.status(200).json({ success: true, redirectTo: ROUTES.DASHBOARD });
   } catch {
     return res.status(500).json({ success: false, message: 'Unable to complete verification.' });
+  }
+}
+
+export async function phoneRegister(req, res) {
+  try {
+    const { isValid, errors, data } = validatePhoneInput(req.body);
+
+    if (!isValid) {
+      return errorResponse(res, 400, errors.join(' '));
+    }
+
+    const result = await registerPhoneUser(data.phone);
+
+    if (!result.success) {
+      return errorResponse(res, 400, result.error || 'Registration failed.');
+    }
+
+    return successResponse(res, 201, 'Phone registration successful. You can now log in.');
+  } catch {
+    return errorResponse(res, 500, AUTH_ERROR_MESSAGES.GENERIC_FAILURE);
+  }
+}
+
+export async function phoneLogin(req, res) {
+  try {
+    const { isValid, errors, data } = validatePhoneInput(req.body);
+
+    if (!isValid) {
+      return errorResponse(res, 400, errors.join(' '));
+    }
+
+    const result = await loginPhoneUser(data.phone);
+
+    if (!result.success || !result.session) {
+      return errorResponse(res, 401, result.error || 'Login failed.');
+    }
+
+    setAuthCookies(res, result.session);
+
+    return successResponse(res, 200, 'Login successful.', { redirectTo: ROUTES.DASHBOARD });
+  } catch {
+    return errorResponse(res, 500, AUTH_ERROR_MESSAGES.GENERIC_FAILURE);
   }
 }

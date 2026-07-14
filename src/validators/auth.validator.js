@@ -1,5 +1,6 @@
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
+const PHONE_REGEX = /^\d{10}$/;
 
 function isValidEmail(email) {
   return typeof email === 'string' && EMAIL_REGEX.test(email.trim());
@@ -7,6 +8,27 @@ function isValidEmail(email) {
 
 function isValidPassword(password) {
   return typeof password === 'string' && password.length >= MIN_PASSWORD_LENGTH;
+}
+
+export function isValidPhone(phone) {
+  return typeof phone === 'string' && PHONE_REGEX.test(phone.trim());
+}
+
+export function validatePhoneInput(body) {
+  const errors = [];
+  const phone = body?.phone?.trim();
+
+  if (!phone) {
+    errors.push('Phone number is required.');
+  } else if (!isValidPhone(phone)) {
+    errors.push('Phone number must be exactly 10 digits.');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    data: { phone }
+  };
 }
 
 export function validateRegisterInput(body) {
@@ -75,3 +97,4 @@ export function validatePasswordResetInput(body) {
     data: { password }
   };
 }
+

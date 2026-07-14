@@ -1,13 +1,15 @@
+import 'dotenv/config';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import app from '../src/app.js';
-import { resetMockDb } from '../src/services/profile.service.js';
-
-let server;
-let baseUrl;
 
 // Set env to test
 process.env.NODE_ENV = 'test';
+
+const { default: app } = await import('../src/app.js');
+const { resetMockDb } = await import('../src/services/profile.service.js');
+
+let server;
+let baseUrl;
 
 test.before(() => {
   return new Promise((resolve) => {

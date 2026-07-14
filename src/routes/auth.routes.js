@@ -15,7 +15,9 @@ import {
   dashboard,
   showUploadPage,
   showVerifyPage,
-  verifySession
+  verifySession,
+  phoneRegister,
+  phoneLogin
 } from '../controllers/auth.controller.js';
 import { requireAuth, redirectIfAuthenticated } from '../middleware/auth.middleware.js';
 
@@ -23,9 +25,11 @@ const router = Router();
 
 router.get('/auth/login', redirectIfAuthenticated, showLoginPage);
 router.post('/auth/login', login);
+router.post('/auth/phone-login', phoneLogin);
 
 router.get('/auth/register', redirectIfAuthenticated, showRegisterPage);
 router.post('/auth/register', register);
+router.post('/auth/phone-register', phoneRegister);
 
 router.get('/auth/google', googleLogin);
 router.get('/auth/google/callback', googleCallback);

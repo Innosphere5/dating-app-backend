@@ -1,27 +1,76 @@
 <%- include('../partials/auth-head', { title: 'Login' }) %>
+<style>
+  .auth-tabs {
+    display: flex;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+    gap: 1rem;
+  }
+  .auth-tab {
+    flex: 1;
+    padding: 0.75rem;
+    text-align: center;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    transition: all 180ms ease;
+  }
+  .auth-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .tab-content {
+    display: none;
+  }
+  .tab-content.active {
+    display: block;
+  }
+</style>
 <body>
   <div class="auth-shell">
     <section class="auth-card" aria-label="Login form">
       <div class="brand"><strong>Sign In</strong></div>
-      <p class="footer-note">Secure access to your account. Use your email and password to continue.</p>
+      <p class="footer-note">Secure access to your account. Choose email or phone number to continue.</p>
+
+      <div class="auth-tabs">
+        <div class="auth-tab active" onclick="switchTab('email')">Email</div>
+        <div class="auth-tab" onclick="switchTab('phone')">Phone</div>
+      </div>
 
       <div id="form-error" class="message-box error" role="alert" aria-live="polite"></div>
 
-      <form id="login-form" novalidate>
-        <div class="form-group">
-          <label for="email">Email</label>
-          <input type="email" id="email" name="email" required autocomplete="email" placeholder="name@example.com" />
-          <p class="field-message" aria-live="polite"></p>
-        </div>
+      <!-- Email Tab Content -->
+      <div id="email-tab" class="tab-content active">
+        <form id="login-form" novalidate>
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required autocomplete="email" placeholder="name@example.com" />
+            <p class="field-message" aria-live="polite"></p>
+          </div>
 
-        <div class="form-group">
-          <label for="password">Password</label>
-          <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="••••••••" />
-          <p class="field-message" aria-live="polite"></p>
-        </div>
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="••••••••" />
+            <p class="field-message" aria-live="polite"></p>
+          </div>
 
-        <button type="submit">Log In</button>
-      </form>
+          <button type="submit">Log In</button>
+        </form>
+      </div>
+
+      <!-- Phone Tab Content -->
+      <div id="phone-tab" class="tab-content">
+        <form id="phone-login-form" novalidate>
+          <div class="form-group">
+            <label for="phone">Phone Number (10 digits)</label>
+            <input type="tel" id="phone" name="phone" required maxlength="10" placeholder="e.g. 9876543210" />
+            <p class="field-message" aria-live="polite"></p>
+          </div>
+
+          <button type="submit">Log In</button>
+        </form>
+      </div>
 
       <a class="social-button" href="/auth/google">Continue with Google</a>
 
@@ -39,6 +88,29 @@
     const emailField = loginForm.elements.email;
     const passwordField = loginForm.elements.password;
 
+    const phoneLoginForm = document.getElementById('phone-login-form');
+    const phoneField = phoneLoginForm.elements.phone;
+
+    function switchTab(type) {
+      document.querySelectorAll('.auth-tab').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      
+      loginErrorBox.textContent = '';
+      loginErrorBox.classList.remove('error', 'success');
+      
+      clearFieldMessage(emailField);
+      clearFieldMessage(passwordField);
+      clearFieldMessage(phoneField);
+
+      if (type === 'email') {
+        document.querySelector('.auth-tab:nth-child(1)').classList.add('active');
+        document.getElementById('email-tab').classList.add('active');
+      } else {
+        document.querySelector('.auth-tab:nth-child(2)').classList.add('active');
+        document.getElementById('phone-tab').classList.add('active');
+      }
+    }
+
     function validateLoginField(field) {
       clearFieldMessage(field);
       const value = field.value.trim();
@@ -55,9 +127,18 @@
       }
     }
 
+    function validatePhoneField(field) {
+      clearFieldMessage(field);
+      const value = field.value.trim();
+      if (!value) return showFieldMessage(field, 'Phone number is required.');
+      if (!/^\d{10}$/.test(value)) return showFieldMessage(field, 'Phone number must be exactly 10 digits.');
+      return showFieldMessage(field, 'Looks good.', 'success');
+    }
+
     function validateLoginForm() {
       let valid = true;
       loginErrorBox.textContent = '';
+      loginErrorBox.classList.remove('error', 'success');
       clearFieldMessage(emailField);
       clearFieldMessage(passwordField);
 
@@ -87,6 +168,9 @@
     emailField.addEventListener('input', () => clearFieldMessage(emailField));
     passwordField.addEventListener('input', () => clearFieldMessage(passwordField));
 
+    phoneField.addEventListener('blur', () => validatePhoneField(phoneField));
+    phoneField.addEventListener('input', () => clearFieldMessage(phoneField));
+
     loginForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       clearFormStatus(loginForm);
@@ -105,6 +189,42 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          setFormStatus(loginErrorBox, result.message || 'Login failed.', 'error');
+          return;
+        }
+
+        window.location.href = result.data.redirectTo;
+      } catch {
+        setFormStatus(loginErrorBox, 'Unable to reach the server. Please try again.', 'error');
+      }
+    });
+
+    phoneLoginForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      clearFormStatus(phoneLoginForm);
+
+      const value = phoneField.value.trim();
+      if (!value) {
+        showFieldMessage(phoneField, 'Phone number is required.');
+        setFormStatus(loginErrorBox, 'Please fix the highlighted fields.', 'error');
+        return;
+      }
+      if (!/^\d{10}$/.test(value)) {
+        showFieldMessage(phoneField, 'Phone number must be exactly 10 digits.');
+        setFormStatus(loginErrorBox, 'Please fix the highlighted fields.', 'error');
+        return;
+      }
+
+      try {
+        const response = await fetch('/auth/phone-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: value })
         });
 
         const result = await response.json();

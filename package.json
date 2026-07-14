@@ -6,7 +6,8 @@
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "node --watch src/app.js"
+    "dev": "node --watch src/app.js",
+    "test": "node --test tests/profile.api.test.js tests/auth.api.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
