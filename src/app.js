@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import authRoutes from "./routes/auth.routes.js";
 import uploadRoutes from "./routes/upload.routes.js";
+import profileRoutes from "./routes/profile.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,6 +21,7 @@ app.use(cookieParser());
 
 app.use(authRoutes);
 app.use('/api', uploadRoutes);
+app.use('/api', profileRoutes);
 
 app.get("/", (req, res) => {
   res.redirect("/auth/login");

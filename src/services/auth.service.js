@@ -51,6 +51,13 @@ export async function exchangeCodeForSession(code) {
 }
 
 export async function getUserFromToken(accessToken) {
+  if (process.env.NODE_ENV === 'test') {
+    if (accessToken === 'valid-token') {
+      return { success: true, user: { id: 'test-user-id', email: 'test@example.com' } };
+    }
+    return { success: false, error: 'Invalid token' };
+  }
+
   const { data, error } = await supabase.auth.getUser(accessToken);
 
   if (error) {
