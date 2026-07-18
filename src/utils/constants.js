@@ -1,6 +1,6 @@
 export const COOKIE_NAMES = {
-  ACCESS_TOKEN: 'sb_access_token',
-  REFRESH_TOKEN: 'sb_refresh_token'
+  ACCESS_TOKEN: 'fb_access_token',
+  REFRESH_TOKEN: 'fb_refresh_token'
 };
 
 export const AUTH_ERROR_MESSAGES = {

@@ -1,7 +1,7 @@
 import 'dotenv/config';
-import { supabaseAdmin } from './config/supabase.js';
+import { db, firestoreFieldValue } from './config/firebase.js';
 
-// Use a valid UUID format for testing
+// Use a valid UID format for testing
 const testPayload = {
   id: '00000000-0000-0000-0000-000000000000',
   first_name: "Jane",
@@ -18,18 +18,14 @@ const testPayload = {
     "https://res.cloudinary.com/demo/image/upload/sample1.jpg",
     "https://res.cloudinary.com/demo/image/upload/sample2.jpg"
   ],
-  updated_at: new Date().toISOString()
+  updated_at: firestoreFieldValue.serverTimestamp()
 };
 
 async function test() {
   try {
-    // Attempt to upsert this payload in the real users table
-    const { data, error } = await supabaseAdmin
-      .from('users')
-      .upsert(testPayload)
-      .select();
-
-    console.log('Result:', { data, error });
+    // Attempt to upsert this payload in the real users collection
+    await db.collection('users').doc(testPayload.id).set(testPayload, { merge: true });
+    console.log('Result: Profile upserted successfully in Firestore!');
   } catch (err) {
     console.error('Unhandled script error:', err);
   }

@@ -69,13 +69,33 @@
         );
       }
 
+      function parseQuery(search) {
+        if (!search || search.length <= 1) return {};
+        return Object.fromEntries(
+          search.substring(1).split('&').map((pair) => {
+            const [key, value] = pair.split('=');
+            return [decodeURIComponent(key), decodeURIComponent(value || '')];
+          })
+        );
+      }
+
       async function finishVerification() {
         const status = document.getElementById('status');
         const session = parseHash(window.location.hash);
+        const query = parseQuery(window.location.search);
 
-        // Supabase sends access_token & refresh_token on verification redirect
-        if (!session.access_token || !session.refresh_token) {
-          status.textContent = 'Verification token is missing or has expired. Redirecting to login...';
+        const payload = {};
+        if (query.code || query.oobCode) {
+          payload.code = query.code || query.oobCode;
+        } else if (session.access_token && session.refresh_token) {
+          payload.access_token = session.access_token;
+          payload.refresh_token = session.refresh_token;
+          payload.expires_in = session.expires_in;
+        }
+
+        // Firebase sends access_token & refresh_token or an action code on verification redirect
+        if (!payload.code && (!payload.access_token || !payload.refresh_token)) {
+          status.textContent = 'Verification token or code is missing or has expired. Redirecting to login...';
           setTimeout(() => {
             window.location.href = '/auth/login?error=verification_failed';
           }, 3000);
@@ -89,7 +109,7 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
-            body: JSON.stringify(session)
+            body: JSON.stringify(payload)
           });
 
           const result = await response.json();

@@ -16,7 +16,8 @@ import {
   syncUserProfile,
   getUserFromToken,
   registerPhoneUser,
-  loginPhoneUser
+  loginPhoneUser,
+  resendVerificationEmail
 } from '../services/auth.service.js';
 import { setAuthCookies, clearAuthCookies, getAuthCookies } from '../utils/cookie.js';
 import { successResponse, errorResponse } from '../utils/response.js';
@@ -39,7 +40,7 @@ export function showForgotPasswordPage(req, res) {
 }
 
 export async function showResetPasswordPage(req, res) {
-  const code = req.query.code;
+  const code = req.query.code || req.query.oobCode;
 
   if (code) {
     const result = await exchangeCodeForSession(code);
@@ -91,6 +92,9 @@ export async function login(req, res) {
     const result = await loginUser(data.email, data.password);
 
     if (!result.success || !result.session) {
+      if (result.error && (result.error.toLowerCase().includes('confirm') || result.error.toLowerCase().includes('verify'))) {
+        return errorResponse(res, 401, 'Email not confirmed. Please check your inbox or resend the verification email.');
+      }
       return errorResponse(res, 401, AUTH_ERROR_MESSAGES.INVALID_CREDENTIALS);
     }
 
@@ -237,7 +241,17 @@ export function showVerifyPage(req, res) {
 
 export async function verifySession(req, res) {
   try {
-    const { access_token, refresh_token, expires_in } = req.body;
+    const { access_token, refresh_token, expires_in, code } = req.body;
+
+    if (code) {
+      const result = await exchangeCodeForSession(code);
+      if (!result.success || !result.session) {
+        return res.status(400).json({ success: false, message: result.error || 'Failed to exchange verification code.' });
+      }
+      setAuthCookies(res, result.session);
+      await syncUserProfile(result.user);
+      return res.status(200).json({ success: true, redirectTo: ROUTES.DASHBOARD });
+    }
 
     if (!access_token || !refresh_token) {
       return res.status(400).json({ success: false, message: 'Session data is missing.' });
@@ -299,6 +313,27 @@ export async function phoneLogin(req, res) {
     setAuthCookies(res, result.session);
 
     return successResponse(res, 200, 'Login successful.', { redirectTo: ROUTES.DASHBOARD });
+  } catch {
+    return errorResponse(res, 500, AUTH_ERROR_MESSAGES.GENERIC_FAILURE);
+  }
+}
+
+export async function resendVerification(req, res) {
+  try {
+    const { isValid, errors, data } = validateEmailInput(req.body);
+
+    if (!isValid) {
+      return errorResponse(res, 400, errors.join(' '));
+    }
+
+    const emailRedirectTo = `${getBaseUrl(req)}/auth/verify`;
+    const result = await resendVerificationEmail(data.email, emailRedirectTo);
+
+    if (!result.success) {
+      return errorResponse(res, 400, result.error || 'Failed to resend verification email.');
+    }
+
+    return successResponse(res, 200, 'Verification email has been resent successfully.');
   } catch {
     return errorResponse(res, 500, AUTH_ERROR_MESSAGES.GENERIC_FAILURE);
   }

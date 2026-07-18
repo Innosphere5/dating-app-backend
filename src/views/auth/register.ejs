@@ -74,7 +74,7 @@
         </form>
       </div>
 
-      <a class="social-button" href="/auth/google">Continue with Google</a>
+      <button type="button" class="social-button" id="google-login-btn">Continue with Google</button>
 
       <div class="page-links">
         <a href="/auth/login">Already have an account?</a>
@@ -250,6 +250,61 @@
         phoneRegisterForm.reset();
       } catch {
         setFormStatus(registerErrorBox, 'Unable to reach the server. Please try again.', 'error');
+      }
+    });
+  </script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCDAASSUvUFbfSaE-Upc4-289LQrvavvd8",
+      authDomain: "dating-app-backend-d34a4.firebaseapp.com",
+      projectId: "dating-app-backend-d34a4",
+      storageBucket: "dating-app-backend-d34a4.firebasestorage.app",
+      messagingSenderId: "536983423340",
+      appId: "1:536983423340:web:af664c1b70bac5496a0b49",
+      measurementId: "G-YN0QD1XMHR"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    document.getElementById('google-login-btn').addEventListener('click', async () => {
+      const registerErrorBox = document.getElementById('form-error');
+      const registerSuccessBox = document.getElementById('form-success');
+      registerErrorBox.textContent = '';
+      registerErrorBox.classList.remove('error', 'success');
+      registerSuccessBox.textContent = '';
+      registerSuccessBox.classList.remove('error', 'success');
+
+      try {
+        const result = await signInWithPopup(auth, provider);
+        const idToken = await result.user.getIdToken();
+        const refreshToken = result.user.refreshToken;
+
+        const response = await fetch('/auth/google/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            access_token: idToken,
+            refresh_token: refreshToken,
+            expires_in: 3600
+          })
+        });
+
+        const resData = await response.json();
+        if (resData.success) {
+          window.location.href = resData.redirectTo || '/dashboard';
+        } else {
+          registerErrorBox.textContent = resData.message || 'Google sign-in failed.';
+          registerErrorBox.classList.add('error');
+        }
+      } catch (err) {
+        console.error(err);
+        registerErrorBox.textContent = 'Google sign-in was cancelled or failed.';
+        registerErrorBox.classList.add('error');
       }
     });
   </script>

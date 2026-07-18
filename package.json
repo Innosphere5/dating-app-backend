@@ -10,13 +10,14 @@
     "test": "node --test tests/profile.api.test.js tests/auth.api.test.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0",
+    "@google-cloud/firestore": "^8.6.0",
     "cloudinary": "^2.10.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.5",
     "ejs": "^3.1.10",
     "express": "^4.19.2",
     "express-rate-limit": "^8.5.2",
+    "firebase-admin": "^14.2.0",
     "multer": "^2.2.0"
   },
   "engines": {

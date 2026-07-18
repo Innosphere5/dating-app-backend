@@ -17,14 +17,14 @@ export async function requireApiAuth(req, res, next) {
 
     // 2. Extract from cookies if not found in header
     if (!accessToken) {
-      accessToken = req.cookies?.sb_access_token || null;
+      accessToken = req.cookies?.fb_access_token || null;
     }
 
     if (!accessToken) {
       return errorResponse(res, 401, 'Unauthorized. Missing JWT token.');
     }
 
-    // Validate the token with Supabase
+    // Validate the token with Firebase
     const result = await getUserFromToken(accessToken);
     if (!result.success || !result.user) {
       return errorResponse(res, 401, 'Unauthorized. Invalid or expired JWT token.');

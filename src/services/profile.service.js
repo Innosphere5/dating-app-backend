@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '../config/supabase.js';
+import { db, firestoreFieldValue } from '../config/firebase.js';
 
 // In-memory mock database for testing
 const mockDb = new Map();
@@ -11,13 +11,13 @@ export function resetMockDb() {
 }
 
 /**
- * Service to handle data access for User Profiles in the 'users' table.
+ * Service to handle data access for User Profiles in the 'users' collection.
  */
 
 /**
  * Get profile fields for a user by their ID.
  * 
- * @param {string} userId User UUID
+ * @param {string} userId User UID
  * @returns {Promise<object|null>} Profile record or null if not found
  */
 export async function getProfileByUserId(userId) {
@@ -29,30 +29,48 @@ export async function getProfileByUserId(userId) {
     return { id: userId, ...profile };
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('users')
-    .select('id, first_name, gender, age, looking_for, show_me, employment_status, salary_range, religion, interests, selfie_image, profile_images, updated_at')
-    .eq('id', userId)
-    .maybeSingle();
+  try {
+    const docRef = db.collection('users').doc(userId);
+    const docSnap = await docRef.get();
 
-  if (error) {
+    if (!docSnap.exists) {
+      return null;
+    }
+
+    const data = docSnap.data();
+
+    // If first_name is null, the profile has not been created yet
+    if (!data || data.first_name === null || data.first_name === undefined) {
+      return null;
+    }
+
+    // Return only the profile fields (matching existing select)
+    return {
+      id: docSnap.id,
+      first_name: data.first_name,
+      gender: data.gender || null,
+      age: data.age || null,
+      looking_for: data.looking_for || null,
+      show_me: data.show_me || null,
+      employment_status: data.employment_status || null,
+      salary_range: data.salary_range || null,
+      religion: data.religion || null,
+      interests: data.interests || null,
+      selfie_image: data.selfie_image || null,
+      profile_images: data.profile_images || null,
+      updated_at: data.updated_at || null
+    };
+  } catch (error) {
     console.error(`Database error in getProfileByUserId for user ${userId}:`, error);
     throw new Error('Database operation failed. Unable to fetch profile.');
   }
-
-  // If first_name is null, the profile has not been created yet
-  if (!data || data.first_name === null) {
-    return null;
-  }
-
-  return data;
 }
 
 /**
  * Create a profile for the user.
  * Returns conflict if profile already exists.
  * 
- * @param {string} userId User UUID
+ * @param {string} userId User UID
  * @param {object} profileData Profile data payload
  * @returns {Promise<object>} Status object indicating success or conflict
  */
@@ -70,60 +88,53 @@ export async function createProfile(userId, profileData) {
     return { success: true, data: { id: userId, ...payload } };
   }
 
-  // Check if profile already exists
-  const existing = await supabaseAdmin
-    .from('users')
-    .select('id, first_name')
-    .eq('id', userId)
-    .maybeSingle();
+  try {
+    const docRef = db.collection('users').doc(userId);
+    const docSnap = await docRef.get();
 
-  if (existing.error) {
-    console.error(`Database error checking profile existence for user ${userId}:`, existing.error);
-    throw new Error('Database operation failed. Unable to check profile existence.');
-  }
+    // Check if profile already exists
+    if (docSnap.exists) {
+      const existingData = docSnap.data();
+      if (existingData && existingData.first_name !== null && existingData.first_name !== undefined) {
+        return { success: false, conflict: true };
+      }
+    }
 
-  if (existing.data && existing.data.first_name !== null) {
-    return { success: false, conflict: true };
-  }
+    const payload = {
+      ...profileData,
+      updated_at: firestoreFieldValue.serverTimestamp()
+    };
 
-  const payload = {
-    ...profileData,
-    updated_at: new Date().toISOString()
-  };
-
-  let dbResult;
-  if (existing.data) {
-    // Row exists but profile fields are null, so update it
-    dbResult = await supabaseAdmin
-      .from('users')
-      .update(payload)
-      .eq('id', userId)
-      .select()
-      .single();
-  } else {
-    // Row does not exist, insert it
-    dbResult = await supabaseAdmin
-      .from('users')
-      .insert({
+    if (docSnap.exists) {
+      // Row exists but profile fields are null, so update it
+      await docRef.update(payload);
+    } else {
+      // Document does not exist, create it
+      await docRef.set({
         id: userId,
         ...payload
-      })
-      .select()
-      .single();
-  }
+      });
+    }
 
-  if (dbResult.error) {
-    console.error(`Database error creating profile for user ${userId}:`, dbResult.error);
+    // Read back the document to return the created data
+    const updatedDoc = await docRef.get();
+    const resultData = updatedDoc.data();
+    // Convert serverTimestamp to ISO string for consistency
+    if (resultData.updated_at && resultData.updated_at.toDate) {
+      resultData.updated_at = resultData.updated_at.toDate().toISOString();
+    }
+
+    return { success: true, data: { id: userId, ...resultData } };
+  } catch (error) {
+    console.error(`Database error creating profile for user ${userId}:`, error);
     throw new Error('Database operation failed. Unable to create profile.');
   }
-
-  return { success: true, data: dbResult.data };
 }
 
 /**
  * Update dynamic profile fields for the user.
  * 
- * @param {string} userId User UUID
+ * @param {string} userId User UID
  * @param {object} updateData Profile fields to update
  * @returns {Promise<object>} Status object indicating success or not found
  */
@@ -142,46 +153,45 @@ export async function updateProfile(userId, updateData) {
     return { success: true, data: { id: userId, ...payload } };
   }
 
-  // Check if profile exists
-  const existing = await supabaseAdmin
-    .from('users')
-    .select('id, first_name')
-    .eq('id', userId)
-    .maybeSingle();
+  try {
+    const docRef = db.collection('users').doc(userId);
+    const docSnap = await docRef.get();
 
-  if (existing.error) {
-    console.error(`Database error checking profile existence for user ${userId}:`, existing.error);
-    throw new Error('Database operation failed. Unable to check profile existence.');
-  }
+    // Check if profile exists
+    if (!docSnap.exists) {
+      return { success: false, notFound: true };
+    }
 
-  if (!existing.data || existing.data.first_name === null) {
-    return { success: false, notFound: true };
-  }
+    const existingData = docSnap.data();
+    if (!existingData || existingData.first_name === null || existingData.first_name === undefined) {
+      return { success: false, notFound: true };
+    }
 
-  const payload = {
-    ...updateData,
-    updated_at: new Date().toISOString()
-  };
+    const payload = {
+      ...updateData,
+      updated_at: firestoreFieldValue.serverTimestamp()
+    };
 
-  const { data, error } = await supabaseAdmin
-    .from('users')
-    .update(payload)
-    .eq('id', userId)
-    .select()
-    .single();
+    await docRef.update(payload);
 
-  if (error) {
+    // Read back for response
+    const updatedDoc = await docRef.get();
+    const resultData = updatedDoc.data();
+    if (resultData.updated_at && resultData.updated_at.toDate) {
+      resultData.updated_at = resultData.updated_at.toDate().toISOString();
+    }
+
+    return { success: true, data: { id: userId, ...resultData } };
+  } catch (error) {
     console.error(`Database error updating profile for user ${userId}:`, error);
     throw new Error('Database operation failed. Unable to update profile.');
   }
-
-  return { success: true, data };
 }
 
 /**
  * Delete profile fields for the user (sets fields to null/empty array).
  * 
- * @param {string} userId User UUID
+ * @param {string} userId User UID
  * @returns {Promise<object>} Status object indicating success or not found
  */
 export async function deleteProfile(userId) {
@@ -208,46 +218,40 @@ export async function deleteProfile(userId) {
     return { success: true };
   }
 
-  // Check if profile exists
-  const existing = await supabaseAdmin
-    .from('users')
-    .select('id, first_name')
-    .eq('id', userId)
-    .maybeSingle();
+  try {
+    const docRef = db.collection('users').doc(userId);
+    const docSnap = await docRef.get();
 
-  if (existing.error) {
-    console.error(`Database error checking profile existence for user ${userId}:`, existing.error);
-    throw new Error('Database operation failed. Unable to check profile existence.');
-  }
+    // Check if profile exists
+    if (!docSnap.exists) {
+      return { success: false, notFound: true };
+    }
 
-  if (!existing.data || existing.data.first_name === null) {
-    return { success: false, notFound: true };
-  }
+    const existingData = docSnap.data();
+    if (!existingData || existingData.first_name === null || existingData.first_name === undefined) {
+      return { success: false, notFound: true };
+    }
 
-  const clearPayload = {
-    first_name: null,
-    gender: null,
-    age: null,
-    looking_for: null,
-    show_me: null,
-    employment_status: null,
-    salary_range: null,
-    religion: null,
-    interests: [],
-    profile_images: [],
-    selfie_image: null,
-    updated_at: new Date().toISOString()
-  };
+    const clearPayload = {
+      first_name: null,
+      gender: null,
+      age: null,
+      looking_for: null,
+      show_me: null,
+      employment_status: null,
+      salary_range: null,
+      religion: null,
+      interests: [],
+      profile_images: [],
+      selfie_image: null,
+      updated_at: firestoreFieldValue.serverTimestamp()
+    };
 
-  const { error } = await supabaseAdmin
-    .from('users')
-    .update(clearPayload)
-    .eq('id', userId);
+    await docRef.update(clearPayload);
 
-  if (error) {
+    return { success: true };
+  } catch (error) {
     console.error(`Database error deleting profile for user ${userId}:`, error);
     throw new Error('Database operation failed. Unable to clear profile fields.');
   }
-
-  return { success: true };
 }
