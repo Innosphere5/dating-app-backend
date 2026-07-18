@@ -1,4 +1,4 @@
-import { db, firestoreFieldValue } from '../config/firebase.js';
+import { supabase } from '../config/supabase.js';
 
 // In-memory mock database for testing
 const mockDb = new Map();
@@ -11,7 +11,7 @@ export function resetMockDb() {
 }
 
 /**
- * Service to handle data access for User Profiles in the 'users' collection.
+ * Service to handle data access for User Profiles in the 'users' table (Supabase).
  */
 
 /**
@@ -23,31 +23,31 @@ export function resetMockDb() {
 export async function getProfileByUserId(userId) {
   if (process.env.NODE_ENV === 'test') {
     const profile = mockDb.get(userId);
-    if (!profile || profile.first_name === null) {
+    if (!profile || profile.full_name === null) {
       return null;
     }
     return { id: userId, ...profile };
   }
 
   try {
-    const docRef = db.collection('users').doc(userId);
-    const docSnap = await docRef.get();
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, full_name, gender, age, looking_for, show_me, employment_status, salary_range, religion, interests, selfie_image, profile_images, updated_at')
+      .eq('id', userId)
+      .single();
 
-    if (!docSnap.exists) {
+    if (error || !data) {
       return null;
     }
 
-    const data = docSnap.data();
-
-    // If first_name is null, the profile has not been created yet
-    if (!data || data.first_name === null || data.first_name === undefined) {
+    // If full_name is null, the profile has not been created yet
+    if (data.full_name === null || data.full_name === undefined) {
       return null;
     }
 
-    // Return only the profile fields (matching existing select)
     return {
-      id: docSnap.id,
-      first_name: data.first_name,
+      id: data.id,
+      full_name: data.full_name,
       gender: data.gender || null,
       age: data.age || null,
       looking_for: data.looking_for || null,
@@ -77,7 +77,7 @@ export async function getProfileByUserId(userId) {
 export async function createProfile(userId, profileData) {
   if (process.env.NODE_ENV === 'test') {
     const existing = mockDb.get(userId);
-    if (existing && existing.first_name !== null) {
+    if (existing && existing.full_name !== null) {
       return { success: false, conflict: true };
     }
     const payload = {
@@ -89,42 +89,56 @@ export async function createProfile(userId, profileData) {
   }
 
   try {
-    const docRef = db.collection('users').doc(userId);
-    const docSnap = await docRef.get();
+    // Check if user row exists and whether profile is already created
+    const { data: existingUser, error: selectError } = await supabase
+      .from('users')
+      .select('id, full_name')
+      .eq('id', userId)
+      .single();
 
     // Check if profile already exists
-    if (docSnap.exists) {
-      const existingData = docSnap.data();
-      if (existingData && existingData.first_name !== null && existingData.first_name !== undefined) {
-        return { success: false, conflict: true };
-      }
+    if (existingUser && existingUser.full_name !== null && existingUser.full_name !== undefined) {
+      return { success: false, conflict: true };
     }
 
     const payload = {
       ...profileData,
-      updated_at: firestoreFieldValue.serverTimestamp()
+      updated_at: new Date().toISOString()
     };
 
-    if (docSnap.exists) {
+    if (existingUser) {
       // Row exists but profile fields are null, so update it
-      await docRef.update(payload);
+      const { data: updatedData, error: updateError } = await supabase
+        .from('users')
+        .update(payload)
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error(`Supabase update error creating profile for user ${userId}:`, updateError);
+        throw new Error('Database operation failed. Unable to create profile.');
+      }
+
+      return { success: true, data: { id: userId, ...updatedData } };
     } else {
-      // Document does not exist, create it
-      await docRef.set({
-        id: userId,
-        ...payload
-      });
-    }
+      // User row does not exist, insert it
+      const { data: insertedData, error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: userId,
+          ...payload
+        })
+        .select()
+        .single();
 
-    // Read back the document to return the created data
-    const updatedDoc = await docRef.get();
-    const resultData = updatedDoc.data();
-    // Convert serverTimestamp to ISO string for consistency
-    if (resultData.updated_at && resultData.updated_at.toDate) {
-      resultData.updated_at = resultData.updated_at.toDate().toISOString();
-    }
+      if (insertError) {
+        console.error(`Supabase insert error creating profile for user ${userId}:`, insertError);
+        throw new Error('Database operation failed. Unable to create profile.');
+      }
 
-    return { success: true, data: { id: userId, ...resultData } };
+      return { success: true, data: { id: userId, ...insertedData } };
+    }
   } catch (error) {
     console.error(`Database error creating profile for user ${userId}:`, error);
     throw new Error('Database operation failed. Unable to create profile.');
@@ -141,7 +155,7 @@ export async function createProfile(userId, profileData) {
 export async function updateProfile(userId, updateData) {
   if (process.env.NODE_ENV === 'test') {
     const existing = mockDb.get(userId);
-    if (!existing || existing.first_name === null) {
+    if (!existing || existing.full_name === null) {
       return { success: false, notFound: true };
     }
     const payload = {
@@ -154,34 +168,39 @@ export async function updateProfile(userId, updateData) {
   }
 
   try {
-    const docRef = db.collection('users').doc(userId);
-    const docSnap = await docRef.get();
-
     // Check if profile exists
-    if (!docSnap.exists) {
+    const { data: existingUser, error: selectError } = await supabase
+      .from('users')
+      .select('id, full_name')
+      .eq('id', userId)
+      .single();
+
+    if (!existingUser || selectError) {
       return { success: false, notFound: true };
     }
 
-    const existingData = docSnap.data();
-    if (!existingData || existingData.first_name === null || existingData.first_name === undefined) {
+    if (existingUser.full_name === null || existingUser.full_name === undefined) {
       return { success: false, notFound: true };
     }
 
     const payload = {
       ...updateData,
-      updated_at: firestoreFieldValue.serverTimestamp()
+      updated_at: new Date().toISOString()
     };
 
-    await docRef.update(payload);
+    const { data: updatedData, error: updateError } = await supabase
+      .from('users')
+      .update(payload)
+      .eq('id', userId)
+      .select()
+      .single();
 
-    // Read back for response
-    const updatedDoc = await docRef.get();
-    const resultData = updatedDoc.data();
-    if (resultData.updated_at && resultData.updated_at.toDate) {
-      resultData.updated_at = resultData.updated_at.toDate().toISOString();
+    if (updateError) {
+      console.error(`Supabase update error for user ${userId}:`, updateError);
+      throw new Error('Database operation failed. Unable to update profile.');
     }
 
-    return { success: true, data: { id: userId, ...resultData } };
+    return { success: true, data: { id: userId, ...updatedData } };
   } catch (error) {
     console.error(`Database error updating profile for user ${userId}:`, error);
     throw new Error('Database operation failed. Unable to update profile.');
@@ -197,11 +216,11 @@ export async function updateProfile(userId, updateData) {
 export async function deleteProfile(userId) {
   if (process.env.NODE_ENV === 'test') {
     const existing = mockDb.get(userId);
-    if (!existing || existing.first_name === null) {
+    if (!existing || existing.full_name === null) {
       return { success: false, notFound: true };
     }
     const clearPayload = {
-      first_name: null,
+      full_name: null,
       gender: null,
       age: null,
       looking_for: null,
@@ -219,21 +238,23 @@ export async function deleteProfile(userId) {
   }
 
   try {
-    const docRef = db.collection('users').doc(userId);
-    const docSnap = await docRef.get();
-
     // Check if profile exists
-    if (!docSnap.exists) {
+    const { data: existingUser, error: selectError } = await supabase
+      .from('users')
+      .select('id, full_name')
+      .eq('id', userId)
+      .single();
+
+    if (!existingUser || selectError) {
       return { success: false, notFound: true };
     }
 
-    const existingData = docSnap.data();
-    if (!existingData || existingData.first_name === null || existingData.first_name === undefined) {
+    if (existingUser.full_name === null || existingUser.full_name === undefined) {
       return { success: false, notFound: true };
     }
 
     const clearPayload = {
-      first_name: null,
+      full_name: null,
       gender: null,
       age: null,
       looking_for: null,
@@ -244,10 +265,18 @@ export async function deleteProfile(userId) {
       interests: [],
       profile_images: [],
       selfie_image: null,
-      updated_at: firestoreFieldValue.serverTimestamp()
+      updated_at: new Date().toISOString()
     };
 
-    await docRef.update(clearPayload);
+    const { error: updateError } = await supabase
+      .from('users')
+      .update(clearPayload)
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error(`Supabase error deleting profile for user ${userId}:`, updateError);
+      throw new Error('Database operation failed. Unable to clear profile fields.');
+    }
 
     return { success: true };
   } catch (error) {

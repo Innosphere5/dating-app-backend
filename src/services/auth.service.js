@@ -1,4 +1,5 @@
-import { adminAuth, db, firestoreFieldValue } from '../config/firebase.js';
+import { adminAuth } from '../config/firebase.js';
+import { supabase } from '../config/supabase.js';
 
 const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY;
 
@@ -94,16 +95,25 @@ export async function registerUser(email, password, emailRedirectTo) {
       emailVerified: false
     });
 
-    // Create Firestore user document
+    // Create Supabase user document
     try {
-      await db.collection('users').doc(userRecord.uid).set({
-        id: userRecord.uid,
-        email: userRecord.email,
-        createdAt: firestoreFieldValue.serverTimestamp(),
-        updatedAt: firestoreFieldValue.serverTimestamp()
-      });
-    } catch (firestoreError) {
-      // Rollback: delete the auth user if Firestore creation fails
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: userRecord.uid,
+          email: userRecord.email,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (insertError) {
+        // Rollback: delete the auth user if Supabase creation fails
+        await adminAuth.deleteUser(userRecord.uid);
+        console.error('Supabase insert error during registration:', insertError.message);
+        return { success: false, error: 'Registration failed. Please try again.', status: 500 };
+      }
+    } catch (dbError) {
+      // Rollback: delete the auth user if Supabase creation fails
       await adminAuth.deleteUser(userRecord.uid);
       return { success: false, error: 'Registration failed. Please try again.', status: 500 };
     }
@@ -206,13 +216,14 @@ export async function loginUser(email, password) {
     };
   }
 
-  // Update last login in Firestore
+  // Update last login in Supabase
   try {
-    await db.collection('users').doc(localId).update({
-      lastLogin: firestoreFieldValue.serverTimestamp()
-    });
+    await supabase
+      .from('users')
+      .update({ last_login: new Date().toISOString() })
+      .eq('id', localId);
   } catch (updateErr) {
-    // Non-fatal: don't block login if Firestore update fails
+    // Non-fatal: don't block login if Supabase update fails
     console.error('Failed to update lastLogin:', updateErr.message);
   }
 
@@ -452,19 +463,34 @@ export async function syncUserProfile(user) {
   }
 
   try {
-    const userRef = db.collection('users').doc(user.id);
-    const userDoc = await userRef.get();
+    // Check if user already exists in Supabase
+    const { data: existingUser, error: selectError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', user.id)
+      .single();
 
-    if (userDoc.exists) {
+    if (existingUser) {
       return { success: true, created: false };
     }
 
-    await userRef.set({
-      id: user.id,
-      email: user.email || null,
-      createdAt: firestoreFieldValue.serverTimestamp(),
-      updatedAt: firestoreFieldValue.serverTimestamp()
-    });
+    // User doesn't exist, create a new record
+    const { error: insertError } = await supabase
+      .from('users')
+      .insert({
+        id: user.id,
+        email: user.email || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+    if (insertError) {
+      // If it's a duplicate key error, treat as already exists
+      if (insertError.code === '23505') {
+        return { success: true, created: false };
+      }
+      return { success: false, error: insertError.message };
+    }
 
     return { success: true, created: true };
   } catch (error) {
@@ -480,11 +506,18 @@ export async function checkPhoneExists(phone) {
   }
   
   try {
-    const snapshot = await db.collection('users')
-      .where('phone', '==', phone)
-      .limit(1)
-      .get();
-    return !snapshot.empty;
+    const { data, error } = await supabase
+      .from('users')
+      .select('id')
+      .eq('phone', phone)
+      .limit(1);
+
+    if (error) {
+      console.error('Supabase error checking phone:', error.message);
+      return false;
+    }
+
+    return data && data.length > 0;
   } catch (error) {
     return false;
   }
@@ -515,19 +548,27 @@ export async function registerPhoneUser(phone) {
       emailVerified: true // Phone users are auto-verified
     });
 
-    // Create Firestore document
+    // Create Supabase user document
     try {
-      await db.collection('users').doc(userRecord.uid).set({
-        id: userRecord.uid,
-        phone: phone,
-        email: syntheticEmail,
-        createdAt: firestoreFieldValue.serverTimestamp(),
-        updatedAt: firestoreFieldValue.serverTimestamp()
-      });
-    } catch (firestoreError) {
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: userRecord.uid,
+          phone: phone,
+          email: syntheticEmail,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (insertError) {
+        // Rollback auth user creation
+        await adminAuth.deleteUser(userRecord.uid);
+        return { success: false, error: insertError.message };
+      }
+    } catch (dbError) {
       // Rollback auth user creation
       await adminAuth.deleteUser(userRecord.uid);
-      return { success: false, error: firestoreError.message };
+      return { success: false, error: dbError.message };
     }
 
     return { success: true, user: { id: userRecord.uid, phone } };

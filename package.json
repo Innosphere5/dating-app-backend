@@ -10,7 +10,7 @@
     "test": "node --test tests/profile.api.test.js tests/auth.api.test.js"
   },
   "dependencies": {
-    "@google-cloud/firestore": "^8.6.0",
+    "@supabase/supabase-js": "^2.110.7",
     "cloudinary": "^2.10.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.5",

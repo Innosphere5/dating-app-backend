@@ -2,7 +2,7 @@ import { errorResponse } from '../utils/apiResponse.js';
 
 // Allowed fields list to reject unknown fields
 const ALLOWED_FIELDS = [
-  'first_name',
+  'full_name',
   'gender',
   'age',
   'looking_for',
@@ -71,23 +71,23 @@ function isValidUrl(string) {
 function validateField(field, value, errors, isPatch = false) {
   // If the field is explicitly set to null, check if it's allowed
   if (value === null) {
-    if (field === 'first_name' || field === 'gender' || field === 'age' || field === 'looking_for' || field === 'show_me' || field === 'employment_status' || field === 'salary_range') {
+    if (field === 'full_name' || field === 'gender' || field === 'age' || field === 'looking_for' || field === 'show_me' || field === 'employment_status' || field === 'salary_range') {
       errors.push({ field, message: `${field} cannot be null.` });
     }
     return; // Allow other fields (like religion, interests, profile_images, selfie_image) to be set to null if explicitly provided in a PATCH
   }
 
   switch (field) {
-    case 'first_name':
+    case 'full_name':
       if (typeof value !== 'string') {
-        errors.push({ field, message: 'First name must be a string.' });
+        errors.push({ field, message: 'Full name must be a string.' });
       } else {
         const trimmed = value.trim();
         if (trimmed.length < 2 || trimmed.length > 50) {
-          errors.push({ field, message: 'First name must be between 2 and 50 characters.' });
+          errors.push({ field, message: 'Full name must be between 2 and 50 characters.' });
         }
         if (hasSqlInjection(trimmed)) {
-          errors.push({ field, message: 'First name contains invalid characters (SQL injection protection).' });
+          errors.push({ field, message: 'Full name contains invalid characters (SQL injection protection).' });
         }
       }
       break;

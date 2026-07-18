@@ -1,6 +1,5 @@
 import { initializeApp, getApps, cert } from 'firebase-admin';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +10,9 @@ const __dirname = dirname(__filename);
 /**
  * Singleton Firebase Admin SDK initialization.
  * Never initializes twice.
+ *
+ * NOTE: Firestore has been removed. All database operations now use Supabase.
+ * Firebase Admin is retained solely for authentication (verifyIdToken, createUser, etc.).
  */
 function initializeFirebase() {
   const apps = getApps();
@@ -72,11 +74,5 @@ function initializeFirebase() {
 
 const app = initializeFirebase();
 
-/** Firebase Admin Auth instance */
+/** Firebase Admin Auth instance (used for token verification, user creation, etc.) */
 export const adminAuth = getAuth(app);
-
-/** Firestore instance */
-export const db = getFirestore(app);
-
-/** Firebase Admin Firestore FieldValue */
-export const firestoreFieldValue = FieldValue;
