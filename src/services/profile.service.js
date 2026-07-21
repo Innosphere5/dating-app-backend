@@ -32,7 +32,7 @@ export async function getProfileByUserId(userId) {
   try {
     const { data, error } = await supabase
       .from('users')
-      .select('id, full_name, gender, age, looking_for, show_me, employment_status, salary_range, religion, interests, selfie_image, profile_images, updated_at')
+      .select('id, full_name, gender, age, looking_for, show_me, employment_status, salary_range, religion, interests, selfie_image, profile_images, about, community, updated_at')
       .eq('id', userId)
       .single();
 
@@ -58,6 +58,8 @@ export async function getProfileByUserId(userId) {
       interests: data.interests || null,
       selfie_image: data.selfie_image || null,
       profile_images: data.profile_images || null,
+      about: data.about || null,
+      community: data.community || null,
       updated_at: data.updated_at || null
     };
   } catch (error) {
@@ -231,6 +233,8 @@ export async function deleteProfile(userId) {
       interests: [],
       profile_images: [],
       selfie_image: null,
+      about: null,
+      community: null,
       updated_at: new Date().toISOString()
     };
     mockDb.set(userId, clearPayload);
@@ -265,6 +269,8 @@ export async function deleteProfile(userId) {
       interests: [],
       profile_images: [],
       selfie_image: null,
+      about: null,
+      community: null,
       updated_at: new Date().toISOString()
     };
 

@@ -12,7 +12,9 @@ const ALLOWED_FIELDS = [
   'religion',
   'interests',
   'selfie_image',
-  'profile_images'
+  'profile_images',
+  'about',
+  'community'
 ];
 
 // Enums
@@ -193,6 +195,32 @@ function validateField(field, value, errors, isPatch = false) {
     case 'selfie_image':
       if (!isValidUrl(value)) {
         errors.push({ field, message: 'Selfie image must be a valid URL.' });
+      }
+      break;
+
+    case 'about':
+      if (typeof value !== 'string') {
+        errors.push({ field, message: 'About must be a string.' });
+      } else {
+        if (value.length > 500) {
+          errors.push({ field, message: 'About must be at most 500 characters.' });
+        }
+        if (hasSqlInjection(value)) {
+          errors.push({ field, message: 'About contains invalid characters (SQL injection protection).' });
+        }
+      }
+      break;
+
+    case 'community':
+      if (typeof value !== 'string') {
+        errors.push({ field, message: 'Community must be a string.' });
+      } else {
+        if (value.length > 100) {
+          errors.push({ field, message: 'Community must be at most 100 characters.' });
+        }
+        if (hasSqlInjection(value)) {
+          errors.push({ field, message: 'Community contains invalid characters (SQL injection protection).' });
+        }
       }
       break;
   }

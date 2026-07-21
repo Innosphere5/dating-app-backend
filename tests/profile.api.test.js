@@ -34,7 +34,7 @@ test.beforeEach(() => {
 });
 
 const validProfileData = {
-  first_name: "Jane",
+  full_name: "Jane Doe",
   gender: "female",
   age: 28,
   looking_for: "relationship",
@@ -44,7 +44,9 @@ const validProfileData = {
   religion: "None",
   interests: ["coding", "hiking"],
   selfie_image: "https://example.com/selfie.jpg",
-  profile_images: ["https://example.com/p1.jpg", "https://example.com/p2.jpg"]
+  profile_images: ["https://example.com/p1.jpg", "https://example.com/p2.jpg"],
+  about: "Passionate developer looking to connect.",
+  community: "Tech & Developers"
 };
 
 test('Missing JWT should return 401 Unauthorized', async () => {
@@ -147,7 +149,9 @@ test('Get Profile - successful retrieval and 404 when not found', async () => {
   assert.equal(resGet.status, 200);
   const getBody = await resGet.json();
   assert.equal(getBody.success, true);
-  assert.equal(getBody.data.first_name, 'Jane');
+  assert.equal(getBody.data.full_name, 'Jane Doe');
+  assert.equal(getBody.data.about, 'Passionate developer looking to connect.');
+  assert.equal(getBody.data.community, 'Tech & Developers');
   assert.equal(getBody.data.age, 28);
   assert.equal(getBody.data.religion, 'None');
 });
@@ -187,7 +191,7 @@ test('Update One Field - successful patch', async () => {
   });
   const getBody = await resGet.json();
   assert.equal(getBody.data.religion, 'Buddhism');
-  assert.equal(getBody.data.first_name, 'Jane'); // unchanged
+  assert.equal(getBody.data.full_name, 'Jane Doe'); // unchanged
   assert.equal(getBody.data.age, 28); // unchanged
 });
 
@@ -306,8 +310,10 @@ test('Maximum Interests - successful validation', async () => {
 
 test('SQL Injection Attempt - should be rejected', async () => {
   const payloads = [
-    { ...validProfileData, first_name: "Jane; DROP TABLE users;--" },
-    { ...validProfileData, religion: "UNION SELECT * FROM auth.users" }
+    { ...validProfileData, full_name: "Jane; DROP TABLE users;--" },
+    { ...validProfileData, religion: "UNION SELECT * FROM auth.users" },
+    { ...validProfileData, about: "About; DROP TABLE users;--" },
+    { ...validProfileData, community: "Community; DROP TABLE users;--" }
   ];
 
   for (const payload of payloads) {
