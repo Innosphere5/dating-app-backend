@@ -14,7 +14,8 @@ const ALLOWED_FIELDS = [
   'selfie_image',
   'profile_images',
   'about',
-  'community'
+  'community',
+  'dob'
 ];
 
 // Enums
@@ -30,6 +31,7 @@ const SALARY_RANGE_ENUM = [
   '200000_300000',
   'above_300000'
 ];
+const COMMUNITY_ENUM = [1, 2, 3]; // 1: straight man, 2: straight woman, 3: lgbtq
 
 /**
  * Detect SQL injection patterns in strings
@@ -73,7 +75,7 @@ function isValidUrl(string) {
 function validateField(field, value, errors, isPatch = false) {
   // If the field is explicitly set to null, check if it's allowed
   if (value === null) {
-    if (field === 'full_name' || field === 'gender' || field === 'age' || field === 'looking_for' || field === 'show_me' || field === 'employment_status' || field === 'salary_range') {
+    if (field === 'full_name' || field === 'gender' || field === 'age' || field === 'looking_for' || field === 'show_me' || field === 'employment_status' || field === 'salary_range' || field === 'community' || field === 'dob') {
       errors.push({ field, message: `${field} cannot be null.` });
     }
     return; // Allow other fields (like religion, interests, profile_images, selfie_image) to be set to null if explicitly provided in a PATCH
@@ -212,14 +214,20 @@ function validateField(field, value, errors, isPatch = false) {
       break;
 
     case 'community':
+      if (!Number.isInteger(value) || !COMMUNITY_ENUM.includes(value)) {
+        errors.push({ field, message: 'Community must be an integer: 1 (straight man), 2 (straight woman), or 3 (lgbtq).' });
+      }
+      break;
+
+    case 'dob':
       if (typeof value !== 'string') {
-        errors.push({ field, message: 'Community must be a string.' });
+        errors.push({ field, message: 'Date of birth (dob) must be a valid date string (YYYY-MM-DD).' });
       } else {
-        if (value.length > 100) {
-          errors.push({ field, message: 'Community must be at most 100 characters.' });
-        }
-        if (hasSqlInjection(value)) {
-          errors.push({ field, message: 'Community contains invalid characters (SQL injection protection).' });
+        const dobRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dobRegex.test(value) || isNaN(Date.parse(value))) {
+          errors.push({ field, message: 'Date of birth (dob) must be a valid date string in YYYY-MM-DD format.' });
+        } else if (hasSqlInjection(value)) {
+          errors.push({ field, message: 'Date of birth contains invalid characters (SQL injection protection).' });
         }
       }
       break;

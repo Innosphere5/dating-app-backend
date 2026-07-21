@@ -46,7 +46,8 @@ const validProfileData = {
   selfie_image: "https://example.com/selfie.jpg",
   profile_images: ["https://example.com/p1.jpg", "https://example.com/p2.jpg"],
   about: "Passionate developer looking to connect.",
-  community: "Tech & Developers"
+  community: 1, // 1: straight man, 2: straight woman, 3: lgbtq
+  dob: "1998-05-15"
 };
 
 test('Missing JWT should return 401 Unauthorized', async () => {
@@ -151,7 +152,8 @@ test('Get Profile - successful retrieval and 404 when not found', async () => {
   assert.equal(getBody.success, true);
   assert.equal(getBody.data.full_name, 'Jane Doe');
   assert.equal(getBody.data.about, 'Passionate developer looking to connect.');
-  assert.equal(getBody.data.community, 'Tech & Developers');
+  assert.equal(getBody.data.community, 1);
+  assert.equal(getBody.data.dob, '1998-05-15');
   assert.equal(getBody.data.age, 28);
   assert.equal(getBody.data.religion, 'None');
 });
@@ -313,7 +315,7 @@ test('SQL Injection Attempt - should be rejected', async () => {
     { ...validProfileData, full_name: "Jane; DROP TABLE users;--" },
     { ...validProfileData, religion: "UNION SELECT * FROM auth.users" },
     { ...validProfileData, about: "About; DROP TABLE users;--" },
-    { ...validProfileData, community: "Community; DROP TABLE users;--" }
+    { ...validProfileData, dob: "1998-05-15; DROP TABLE users;--" }
   ];
 
   for (const payload of payloads) {
@@ -416,4 +418,59 @@ test('Delete Profile and Delete Twice behavior', async () => {
     }
   });
   assert.equal(resDeleteTwice.status, 404);
+});
+
+test('Community Validation - accepts 1, 2, 3 and rejects invalid values', async () => {
+  // Valid community values: 1 (straight man), 2 (straight woman), 3 (lgbtq)
+  for (const communityVal of [1, 2, 3]) {
+    resetMockDb();
+    const payload = { ...validProfileData, community: communityVal };
+    const res = await fetch(`${baseUrl}/profile`, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer valid-token',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    assert.equal(res.status, 201);
+  }
+
+  // Invalid community values
+  for (const communityVal of [0, 4, '1', 'straight man', null]) {
+    resetMockDb();
+    const payload = { ...validProfileData, community: communityVal };
+    const res = await fetch(`${baseUrl}/profile`, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer valid-token',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.equal(body.success, false);
+    assert.ok(body.errors.some(err => err.field === 'community'));
+  }
+});
+
+test('DOB Validation - requires valid YYYY-MM-DD date format', async () => {
+  const invalidDobs = ['15-05-1998', '1998/05/15', 'invalid-date', 19980515, null];
+  for (const dob of invalidDobs) {
+    resetMockDb();
+    const payload = { ...validProfileData, dob };
+    const res = await fetch(`${baseUrl}/profile`, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer valid-token',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.equal(body.success, false);
+    assert.ok(body.errors.some(err => err.field === 'dob'));
+  }
 });

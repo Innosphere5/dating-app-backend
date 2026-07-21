@@ -223,9 +223,14 @@ Initializes a user profile in Supabase. All fields are required on initializatio
       "https://example.com/img3.jpg"
     ],
     "about": "Passionate developer who loves outdoors and tech.",
-    "community": "Tech Innovators"
+    "community": 1,
+    "dob": "1998-05-15"
   }
   ```
+* **Community Values Legend:**
+  - `1`: Straight Man
+  - `2`: Straight Woman
+  - `3`: LGBTQ+
 * **Testing Command:**
   ```bash
   curl -X POST https://dating-app-backend-g8so.onrender.com/api/profile \
@@ -244,7 +249,8 @@ Initializes a user profile in Supabase. All fields are required on initializatio
       "selfie_image": "https://example.com/selfie.jpg",
       "profile_images": ["https://example.com/img1.jpg", "https://example.com/img2.jpg", "https://example.com/img3.jpg"],
       "about": "Passionate developer who loves outdoors and tech.",
-      "community": "Tech Innovators"
+      "community": 1,
+      "dob": "1998-05-15"
     }'
   ```
 
