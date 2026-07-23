@@ -5,6 +5,7 @@ import {
   validatePasswordResetInput,
   validatePhoneInput
 } from '../validators/auth.validator.js';
+import { validateSignupInput } from '../utils/validators.js';
 import {
   registerUser,
   loginUser,
@@ -16,9 +17,12 @@ import {
   syncUserProfile,
   getUserFromToken,
   registerPhoneUser,
-  loginPhoneUser,
-  resendVerificationEmail
+  loginPhoneUser
 } from '../services/auth.service.js';
+import { createFirebaseUser, generateVerificationLink, getUserByEmail } from '../services/firebaseAuth.service.js';
+import { sendVerificationEmail } from '../services/email.service.js';
+import { logAuditEvent, AUDIT_EVENTS } from '../services/audit.service.js';
+import config from '../config/env.js';
 import { setAuthCookies, clearAuthCookies, getAuthCookies } from '../utils/cookie.js';
 import { successResponse, errorResponse } from '../utils/response.js';
 import { AUTH_ERROR_MESSAGES, ROUTES } from '../utils/constants.js';
@@ -28,11 +32,15 @@ function getBaseUrl(req) {
 }
 
 export function showLoginPage(req, res) {
-  res.render('auth/login', { error: null });
+  res.render('auth/login', { error: null, csrfToken: res.locals?.csrfToken });
 }
 
 export function showRegisterPage(req, res) {
-  res.render('auth/register', { error: null });
+  res.render('auth/register', { error: null, csrfToken: res.locals?.csrfToken });
+}
+
+export function showSignupPage(req, res) {
+  res.render('auth/signup', { error: null, csrfToken: res.locals?.csrfToken });
 }
 
 export function showForgotPasswordPage(req, res) {
@@ -56,29 +64,79 @@ export async function showResetPasswordPage(req, res) {
   return res.render('auth/reset-password', { error: null });
 }
 
-export async function register(req, res) {
+function isHtmlRequest(req) {
+  const accept = req.headers.accept || '';
+  return accept.includes('text/html') && !req.xhr && !req.headers['x-requested-with'];
+}
+
+export async function signup(req, res) {
   try {
-    const { isValid, errors, data } = validateRegisterInput(req.body);
+    const { isValid, errors, data } = validateSignupInput(req.body);
 
     if (!isValid) {
+      if (isHtmlRequest(req)) {
+        return res.status(400).render('auth/signup', { error: errors.join(' '), csrfToken: res.locals?.csrfToken });
+      }
       return errorResponse(res, 400, errors.join(' '));
     }
 
-    const emailRedirectTo = `${getBaseUrl(req)}/auth/verify`;
-    const result = await registerUser(data.email, data.password, emailRedirectTo);
+    // 1. Check if email already exists
+    const existingUser = await getUserByEmail(data.email);
+    if (existingUser) {
+      const msg = 'This email is already registered. Please log in.';
+      if (isHtmlRequest(req)) {
+        return res.status(400).render('auth/signup', { error: msg, csrfToken: res.locals?.csrfToken });
+      }
+      return errorResponse(res, 400, msg);
+    }
 
-    if (!result.success) {
-      const status = result.status || 400;
-      const message = result.error || AUTH_ERROR_MESSAGES.EMAIL_IN_USE;
-      return errorResponse(res, status, message);
+    // 2. Create Firebase user via Admin SDK
+    const userRecord = await createFirebaseUser({
+      email: data.email,
+      password: data.password,
+      fullName: data.fullName
+    });
+
+    // 3. Generate verification link and send branded email
+    const verificationLink = await generateVerificationLink(data.email);
+    const emailResult = await sendVerificationEmail({
+      email: data.email,
+      fullName: data.fullName,
+      verificationLink
+    });
+
+    // 4. Store pending verification in session (include link for dev mode)
+    if (req.session) {
+      req.session.pendingVerification = true;
+      req.session.pendingEmail = data.email;
+      // Store link in session for dev-mode display when email delivery fails
+      if (config.env === 'development' && emailResult.provider === 'log') {
+        req.session.devVerificationLink = verificationLink;
+      }
+    }
+
+    if (isHtmlRequest(req)) {
+      return res.redirect(`/auth/verify-pending?email=${encodeURIComponent(data.email)}`);
     }
 
     return successResponse(res, 201, 'Registration successful. Please check your email to verify your account.', {
-      userId: result.user?.id
+      userId: userRecord.uid,
+      pendingVerification: true,
+      redirectTo: '/auth/verify-pending'
     });
-  } catch {
-    return errorResponse(res, 500, AUTH_ERROR_MESSAGES.GENERIC_FAILURE);
+  } catch (error) {
+    const msg = error.code === 'auth/email-already-exists' ? 'This email is already registered. Please log in.' : (error.message || AUTH_ERROR_MESSAGES.GENERIC_FAILURE);
+    if (isHtmlRequest(req)) {
+      return res.status(400).render('auth/signup', { error: msg, csrfToken: res.locals?.csrfToken });
+    }
+    return errorResponse(res, 400, msg);
   }
+}
+
+
+export async function register(req, res) {
+  // Alias register to signup for backward compatibility
+  return signup(req, res);
 }
 
 export async function login(req, res) {
@@ -89,16 +147,44 @@ export async function login(req, res) {
       return errorResponse(res, 400, errors.join(' '));
     }
 
+    // Authenticate user via auth service
     const result = await loginUser(data.email, data.password);
 
-    if (!result.success || !result.session) {
-      if (result.error && (result.error.toLowerCase().includes('confirm') || result.error.toLowerCase().includes('verify'))) {
-        return errorResponse(res, 401, 'Email not confirmed. Please check your inbox or resend the verification email.');
+    if (!result.success) {
+      const isUnverified = result.error && (result.error.toLowerCase().includes('confirm') || result.error.toLowerCase().includes('verify'));
+      if (isUnverified) {
+        logAuditEvent(AUDIT_EVENTS.LOGIN_BLOCKED_UNVERIFIED, { email: data.email });
+        return res.status(403).json({
+          success: false,
+          message: 'Please verify your email before accessing your account.',
+          data: { emailVerified: false, resendUrl: '/auth/resend-verification' }
+        });
       }
       return errorResponse(res, 401, AUTH_ERROR_MESSAGES.INVALID_CREDENTIALS);
     }
 
+    // Verify email status with Admin SDK
+    const userRecord = await getUserByEmail(data.email);
+    if (userRecord && !userRecord.emailVerified && process.env.NODE_ENV !== 'test') {
+      logAuditEvent(AUDIT_EVENTS.LOGIN_BLOCKED_UNVERIFIED, { uid: userRecord.uid, email: data.email });
+      return res.status(403).json({
+        success: false,
+        message: 'Please verify your email before accessing your account.',
+        data: { emailVerified: false, resendUrl: '/auth/resend-verification' }
+      });
+    }
+
     setAuthCookies(res, result.session);
+    if (req.session) {
+      req.session.user = {
+        uid: result.user.id,
+        email: result.user.email,
+        verified: true
+      };
+      delete req.session.pendingVerification;
+      delete req.session.pendingEmail;
+    }
+
     await syncUserProfile(result.user);
 
     return successResponse(res, 200, 'Login successful.', { redirectTo: ROUTES.DASHBOARD });
@@ -106,6 +192,7 @@ export async function login(req, res) {
     return errorResponse(res, 500, AUTH_ERROR_MESSAGES.GENERIC_FAILURE);
   }
 }
+
 
 export async function googleLogin(req, res) {
   try {

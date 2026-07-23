@@ -22,9 +22,10 @@ function initializeFirebase() {
 
   // Try loading from service account JSON file first
   const possiblePaths = [
+    resolve(__dirname, '..', '..', 'servicekey.json'),
     resolve(__dirname, '..', '..', 'serviceAccountKey.json'),
-    resolve(__dirname, '..', 'dating-app-backend-d34a4-firebase-adminsdk-fbsvc-abcef3b9ec.json'),
-    resolve(__dirname, '..', '..', 'dating-app-backend-d34a4-firebase-adminsdk-fbsvc-abcef3b9ec.json')
+    resolve(__dirname, '..', 'dating-app-backend-d34a4-firebase-adminsdk-fbsvc-b644abdc70.json'),
+    resolve(__dirname, '..', '..', 'dating-app-backend-d34a4-firebase-adminsdk-fbsvc-b644abdc70.json')
   ];
 
   let serviceAccountPath = possiblePaths.find(p => existsSync(p));

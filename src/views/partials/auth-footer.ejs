@@ -57,4 +57,22 @@
       invalid.focus();
     }
   }
+
+  // Automatically attach X-CSRF-Token header to fetch POST requests
+  const _originalFetch = window.fetch;
+  window.fetch = function(url, options = {}) {
+    const metaCsrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (metaCsrf && options.method && options.method.toUpperCase() !== 'GET') {
+      options.headers = options.headers || {};
+      if (options.headers instanceof Headers) {
+        if (!options.headers.has('X-CSRF-Token')) options.headers.append('X-CSRF-Token', metaCsrf);
+      } else if (Array.isArray(options.headers)) {
+        options.headers.push(['X-CSRF-Token', metaCsrf]);
+      } else {
+        options.headers['X-CSRF-Token'] = metaCsrf;
+      }
+    }
+    return _originalFetch(url, options);
+  };
 </script>
+

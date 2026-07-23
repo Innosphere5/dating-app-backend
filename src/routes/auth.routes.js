@@ -2,9 +2,11 @@ import { Router } from 'express';
 import {
   showLoginPage,
   showRegisterPage,
+  showSignupPage,
   showForgotPasswordPage,
   showResetPasswordPage,
   register,
+  signup,
   login,
   googleLogin,
   googleCallback,
@@ -21,16 +23,21 @@ import {
   resendVerification
 } from '../controllers/auth.controller.js';
 import { requireAuth, redirectIfAuthenticated } from '../middleware/auth.middleware.js';
+import { authRateLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
 
 router.get('/auth/login', redirectIfAuthenticated, showLoginPage);
-router.post('/auth/login', login);
+router.post('/auth/login', authRateLimiter, login);
 router.post('/auth/phone-login', phoneLogin);
 
+router.get('/auth/signup', redirectIfAuthenticated, showSignupPage);
+router.post('/auth/signup', authRateLimiter, signup);
+
 router.get('/auth/register', redirectIfAuthenticated, showRegisterPage);
-router.post('/auth/register', register);
+router.post('/auth/register', authRateLimiter, register);
 router.post('/auth/phone-register', phoneRegister);
+
 
 router.get('/auth/google', googleLogin);
 router.get('/auth/google/callback', googleCallback);

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify your email address for Dating App</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f6f8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; color: #1a202c;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f6f8; padding: 30px 0;">
+    <tr>
+      <td align="center">
+        <!-- Main Card Container -->
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
+          
+          <!-- Header Bar -->
+          <tr>
+            <td style="background-color: #4f46e5; padding: 28px 32px; text-align: left;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700; letter-spacing: -0.5px;">Dating App</h1>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 36px 32px; text-align: left;">
+              <h2 style="margin: 0 0 16px 0; color: #111827; font-size: 20px; font-weight: 600;">Hello <%= firstName %>,</h2>
+              <p style="margin: 0 0 20px 0; color: #4b5563; font-size: 15px; line-height: 1.6;">
+                Thank you for creating an account with Dating App. Please confirm your email address to activate your account and complete your registration.
+              </p>
+
+              <!-- CTA Button -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 28px 0;">
+                <tr>
+                  <td align="center" style="border-radius: 6px; background-color: #4f46e5;">
+                    <a href="<%= verificationLink %>" target="_blank" style="display: inline-block; padding: 14px 28px; font-size: 15px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 6px; background-color: #4f46e5; border: 1px solid #4f46e5;">Verify Email Address</a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 0 0 16px 0; color: #6b7280; font-size: 14px; line-height: 1.5;">
+                If the button above does not work, copy and paste the following link into your web browser:
+              </p>
+              <p style="margin: 0 0 24px 0; font-size: 13px; line-height: 1.5; word-break: break-all;">
+                <a href="<%= verificationLink %>" style="color: #4f46e5; text-decoration: underline;"><%= verificationLink %></a>
+              </p>
+
+              <!-- Expiration Notice -->
+              <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 4px; margin-bottom: 24px;">
+                <p style="margin: 0; color: #1e40af; font-size: 13px; line-height: 1.4;">
+                  <strong>Note:</strong> This verification link will expire in 24 hours for your security.
+                </p>
+              </div>
+
+              <!-- Security Warning -->
+              <p style="margin: 0; color: #9ca3af; font-size: 12px; line-height: 1.5; border-top: 1px solid #f3f4f6; padding-top: 20px;">
+                If you did not request this registration, please disregard this message. No further action is required.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 20px 32px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">&copy; <%= new Date().getFullYear() %> Dating App. All rights reserved.</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
